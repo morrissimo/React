@@ -37,3 +37,5 @@ Note: The latest version of this plugin is compatible with both API 5 and API 4.
 1.2.3: Fixed a bug where the config would not load unless `words[]` was edited.
 
 1.2.4: Fixed `min-players` acting like a maximum
+
+1.3.0: Added constant or randomized `delay` capability
