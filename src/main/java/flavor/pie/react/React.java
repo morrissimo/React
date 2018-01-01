@@ -142,6 +142,14 @@ public class React {
             root.getNode("min-players").setValue(assetRoot.getNode("min-players").getValue());
             root.getNode("version").setValue(3);
         }
+        if (version < 4) {
+            int oldDelay = root.getNode("delay").getInt();
+            root.getNode("delay").setValue(assetRoot.getNode("delay").getValue());
+            root.getNode("delay", "type").setValue("constant");
+            root.getNode("delay", "constant").setValue(oldDelay);
+            root.getNode("version").setValue(4);
+            logger.info("Ported old config (version=3) delay value (" + oldDelay + ") to new config format (version=4)");
+        }
         loader.save(root);
     }
     @Listener
