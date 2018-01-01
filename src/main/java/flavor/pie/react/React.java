@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-@Plugin(id="react",name="React",description="A little game to be played in chat.",authors="pie_flavor",version="1.2.4")
+@Plugin(id="react",name="React",description="A little game to be played in chat.",authors="pie_flavor",version="1.3.0")
 public class React {
     @Inject
     Game game;
@@ -50,7 +50,8 @@ public class React {
     ConfigurationNode root;
     boolean inGame;
     List<String> words;
-    int delay;
+    private static final int DEFAULT_DELAY = 300;    // seconds
+    int gameDelay = -1;
     Text prefix;
     Text text;
     Text suffix;
@@ -90,6 +91,24 @@ public class React {
             throw ex;
         }
     }
+    int getDelay(boolean force) {
+        if (gameDelay == -1 || force) {
+            gameDelay = this.DEFAULT_DELAY;
+            String delayType;
+            delayType = root.getNode("delay", "type").getString("constant");
+            if (delayType.equals("constant")) {
+                gameDelay = root.getNode("delay", "constant").getInt(this.DEFAULT_DELAY);
+            } else if (delayType.equals("random")) {
+                int minDelay = root.getNode("delay", "random", "min").getInt(this.DEFAULT_DELAY);
+                int maxDelay = root.getNode("delay", "random", "max").getInt(this.DEFAULT_DELAY * 2);
+                Random rnd = new Random();
+                gameDelay = rnd.nextInt((maxDelay + 1) - minDelay) + minDelay;
+            } else {
+                logger.error("Unsupported delay type configured - falling back to constant (300s)");
+            }
+        }
+        return gameDelay;
+    }
     void loadConfig() throws IOException, ObjectMappingException {
         updateConfig();
         TypeToken<Text> textToken = TypeToken.of(Text.class);
@@ -98,7 +117,6 @@ public class React {
         prefix = root.getNode("prefix").getValue(textToken, Text.of());
         text = root.getNode("text").getValue(textToken, Text.of());
         suffix = root.getNode("suffix").getValue(textToken, Text.of());
-        delay = root.getNode("delay").getInt();
         commands = root.getNode("rewards", "commands").getList(stringToken, Lists.newArrayList());
         minPlayers = root.getNode("min-players").getInt();
         game.getServiceManager().provide(EconomyService.class).ifPresent(svc -> {
@@ -110,7 +128,7 @@ public class React {
             }
         });
         if (task != null) task.cancel();
-        task = Task.builder().execute(this::newGame).delay(delay, TimeUnit.SECONDS).interval(delay, TimeUnit.SECONDS).name("react-S-createGame").submit(this);
+        task = Task.builder().execute(this::newGame).delay(getDelay(true), TimeUnit.SECONDS).name("react-S-createGame").submit(this);
     }
     void updateConfig() throws IOException, ObjectMappingException {
         int version = root.getNode("version").getInt();
@@ -142,6 +160,7 @@ public class React {
         }
     }
     void newGame() {
+        task = Task.builder().execute(this::newGame).delay(getDelay(false), TimeUnit.SECONDS).name("react-S-createGame").submit(this);
         if (!game.getState().equals(GameState.SERVER_STARTED)) return;
         if (minPlayers > game.getServer().getOnlinePlayers().size()) return;
         inGame = true;
@@ -155,6 +174,7 @@ public class React {
     public void chat(MessageChannelEvent.Chat e, @First Player p) {
         String chat = e.getRawMessage().toPlain().trim();
         if (inGame && chat.equalsIgnoreCase(current)) {
+            task.cancel();
             game.getServer().getBroadcastChannel().send(Text.of(p.getName()+" has won! Time: "+(Instant.now().getEpochSecond() - started.getEpochSecond()) +" seconds!"));
             inGame = false;
             commands.forEach(s -> game.getCommandManager().process(s.startsWith("*") ? game.getServer().getConsole() : p, s.replaceAll("^\\*", "").replace("$winner", p.getName())));
@@ -163,6 +183,7 @@ public class React {
                     svc.getOrCreateAccount(p.getUniqueId()).ifPresent(acc -> acc.deposit(currency, BigDecimal.valueOf(reward), Cause.builder().from(e.getCause()).named("PluginReact", container).build()));
                 }
             });
+            task = Task.builder().execute(this::newGame).delay(getDelay(true), TimeUnit.SECONDS).name("react-S-createGame").submit(this);
         }
 
     }
