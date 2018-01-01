@@ -14,7 +14,7 @@ There are three Text blocks, `text{}`, `prefix{}`, and `suffix{}`. `prefix{}` an
 
 There is also the `words[]` block. `words[]` is a list of things to put on the hover text. Which one to use is chosen randomly each time. Each entry in `words[]` does not have to be a single word, and can be multiple words. Note that any word using any characters other than letters must have quotes around it.
 
-`delay` is the number of seconds between new words being selected. It is also the delay after starting or reloading before  a new game is selected. 
+`delay` contains settings to control how much time (in seconds) elapses between broadcasts being displayed. The subkey "type" should be one of "constant" or "random"; the other subkeys should be used to configure the behavior based on the specified "type". Defaults to a constant delay of 300 seconds (5 mins).
 
 `min-players` is the number of players that is required for the game to start. Set to 0 to disable.
 
